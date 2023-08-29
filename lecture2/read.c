@@ -1,10 +1,10 @@
 #include <stdio.h>
 
 int main() {
-    char ptr[10];
-    size_t n = 10;
+    char *ptr = NULL;
+    size_t n = 0;
     getline(&ptr, &n, stdin);
-    printf("%s\n", ptr);
+    printf("%s", ptr);
     getline(&ptr, &n, stdin);
-    printf("%s\n", ptr);
+    printf("%s", ptr);
 }
