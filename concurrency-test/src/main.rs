@@ -10,8 +10,8 @@ use std::fs::{canonicalize, remove_file};
 use std::future::Future;
 use std::io::BufRead;
 use std::path::PathBuf;
+use std::process::exit;
 use std::process::Command;
-use std::process::{exit, ExitCode};
 use std::sync::Mutex;
 
 /*
@@ -30,6 +30,7 @@ use std::sync::Mutex;
  */
 
 // we want to delete the named pipes at the end
+// keeping global so that the signal handle (eventually) can access it
 lazy_static! {
     static ref TO_DELETE: Mutex<HashMap<PathBuf, i32>> = Mutex::new(HashMap::new());
 }
@@ -82,15 +83,6 @@ fn mkpipe(prefix: &String, i: i32) -> impl Future<Output = std::io::Result<async
     }
 }
 
-// pointer from https://stackoverflow.com/questions/57860613/how-to-add-a-shutdown-hook-to-a-rust-program
-struct Cleanup;
-
-impl Drop for Cleanup {
-    fn drop(&mut self) {
-        finish();
-    }
-}
-
 #[command(
     name = "test_concurrency",
     about = "create a bunch of named pipes and then see if a child process start to read those pipes concurrently."
@@ -102,9 +94,8 @@ impl Drop for Cleanup {
 )]
 #[argument("command", help = "the command to run")]
 #[argument("args", help = "arguments to pass to the command")]
-fn main(prefix: String, count: i32, command: String, args: Vec<String>) -> ExitCode {
+fn main(prefix: String, count: i32, command: String, args: Vec<String>) {
     // create the named pipes
-    let _cleanup = Cleanup;
     let mut pipes = Vec::new();
     for i in 0..count {
         pipes.push(mkpipe(&prefix, i));
@@ -183,6 +174,20 @@ fn main(prefix: String, count: i32, command: String, args: Vec<String>) -> ExitC
         }
     }
 
+    let rc = check_read_files(reading_files);
+
+    // we are done now, make the child go away
+    pcheck("child process couldn't be killed".to_string(), child.kill());
+    pcheck("wait for child".to_string(), child.wait());
+
+    if count == rc {
+        println!("✅ all files are being read.")
+    }
+    finish();
+    exit(rc);
+}
+
+fn check_read_files(reading_files: Vec<PathBuf>) -> i32 {
     // mark any files being read with the number 0
     let mut map = TO_DELETE.lock().unwrap();
     for file in reading_files {
@@ -193,10 +198,6 @@ fn main(prefix: String, count: i32, command: String, args: Vec<String>) -> ExitC
         }
     }
 
-    // we are done now, make the child go away
-    pcheck("child process couldn't be killed".to_string(), child.kill());
-    pcheck("wait for child".to_string(), child.wait());
-
     // check which files are not being read
     let mut count = 0;
     for (k, v) in map.iter() {
@@ -205,11 +206,7 @@ fn main(prefix: String, count: i32, command: String, args: Vec<String>) -> ExitC
             count += 1;
         }
     }
-    if count == 0 {
-        println!("✅ all files are being read.")
-    }
-    println!("{}", count);
-    ExitCode::from(count)
+    return count;
 }
 
 // recursively find all the descendants of a pid and add to a vector
