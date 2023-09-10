@@ -26,7 +26,7 @@ fn finish() {
     }
 }
 
-fn mkpipe(prefix: &String, i: i32) -> impl Future<Output = ()> {
+fn mkpipe(prefix: &String, i: i32) -> impl Future<Output = std::io::Result<async_fs::File>> {
     let file_str = format!("{}{}", prefix, i);
     let file_cstring = CString::new(file_str.as_str()).unwrap();
     let rc = unistd::mkfifo(file_cstring.as_c_str(), stat::Mode::S_IRWXU);
@@ -35,8 +35,9 @@ fn mkpipe(prefix: &String, i: i32) -> impl Future<Output = ()> {
     TO_DELETE.lock().unwrap().insert(canonicalize(&file_str).unwrap(), 1);
     let boxed_file_str = Box::new(file_str);
     async move {
-        async_fs::OpenOptions::new().write(true).read(false).open(*boxed_file_str.clone()).await;
-        println!("opened {}", *boxed_file_str)
+        let rc = async_fs::OpenOptions::new().write(true).read(false).open(*boxed_file_str.clone()).await;
+        println!("opened {}", *boxed_file_str);
+        rc
     }
 }
 
@@ -73,7 +74,7 @@ fn main(
     let mut child = perror(&format!("starting {:?}", &cmd), cmd.spawn());
     println!("child pid {}", child.id());
     
-    futures::executor::block_on(futures::future::join_all(pipes));
+    let jpipes = futures::executor::block_on(futures::future::join_all(pipes));
 
     std::thread::sleep(std::time::Duration::from_secs(2));
 
@@ -147,6 +148,9 @@ fn main(
     }
     child.kill();
     child.wait();
+    for jpipe in jpipes {
+        println!("{:?}", jpipe);
+    }
     for (k, v) in map.iter() {
         if *v != 0 {
             println!("not reading {}", k.to_str().unwrap());
