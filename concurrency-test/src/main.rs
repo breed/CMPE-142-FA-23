@@ -158,12 +158,11 @@ fn main(prefix: String, count: i32, command: String, args: Vec<String>) {
                 if nr != "0" {
                     continue;
                 }
-                let fd: i32 = parts
+                let fd: i32 = i32::from_str_radix(parts
                     .next()
                     .unwrap_or("0x-1")
                     .get(2..)
-                    .unwrap()
-                    .parse()
+                    .unwrap(), 16)
                     .unwrap();
                 let link = std::fs::read_link(format!("/proc/{}/fd/{}", pid, fd));
                 reading_files.push(link.unwrap());
@@ -180,7 +179,7 @@ fn main(prefix: String, count: i32, command: String, args: Vec<String>) {
     pcheck("child process couldn't be killed".to_string(), child.kill());
     pcheck("wait for child".to_string(), child.wait());
 
-    if count == rc {
+    if rc == 0 {
         println!("✅ all files are being read.")
     }
     finish();
@@ -193,8 +192,6 @@ fn check_read_files(reading_files: Vec<PathBuf>) -> i32 {
     for file in reading_files {
         if map.contains_key(&file) {
             map.insert(file, 0);
-        } else {
-            println!("skipping {}", file.to_str().unwrap());
         }
     }
 
