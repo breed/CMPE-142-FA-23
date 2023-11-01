@@ -34,7 +34,7 @@ void List_Insert(list_t *L, int key) {
 
 void *test_list(void *v) {
     list_t *L = v;
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < 10000; i++) {
         List_Insert(L, i);
     }
 }
@@ -45,12 +45,15 @@ void main() {
     list_t L;
     List_Init(&L);
     test_list(&L);
+    /*
     pthread_t threads[THREAD_COUNT];
 
-    /*
     for (int i = 0; i < THREAD_COUNT; i++) {
         pthread_create(&threads[i], NULL, test_list, &L);
     }
+    printf("Searching for 0: %d\n", List_Lookup(&L, 0));
+    printf("Searching for 9000: %d\n", List_Lookup(&L, 900));
+    printf("Searching for 90000: %d\n", List_Lookup(&L, 90000));
     for (int i = 0; i < THREAD_COUNT; i++) {
         pthread_join(threads[i], NULL);
     }
@@ -58,6 +61,9 @@ void main() {
     int count = 0;
     for (node_t *curr = L.head; curr; curr = curr->next) count++;
     printf("total list size %d\n", count);
+    printf("Searching for 0: %d\n", List_Lookup(&L, 0));
+    printf("Searching for 9000: %d\n", List_Lookup(&L, 9000));
+    printf("Searching for 90000: %d\n", List_Lookup(&L, 90000));
 }
 
 
